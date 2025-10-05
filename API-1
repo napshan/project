@@ -1,241 +1,112 @@
 #include <iostream>
-#include <fstream>
 #include <string>
-#include <ctime>
-#include <chrono>
-#include <iomanip>
-#include <sstream>
-#include <map>
-#include <vector>
-/*#include <openssl/hmac.h>
-#include <openssl/evp.h>
-#include <nlohmann/json.hpp>*/
+#include <unordered_map>
+#include <fstream>
 
-using json = nlohmann::json;
-using namespace std;
+// Token管理與攻擊次數追蹤
+class TokenManager {
+private:
+    std::unordered_map<std::string, bool> validTokens;
+    int attackCount = 0;
+    const int attackThreshold = 3; // 攻擊次數閾值
+    const std::string logFile = "attack_log.txt";
 
-// ------------------- 設定 -------------------
-const std::string FALLBACK_SECRET = "default_fallback_secret";
-
-// ------------------- Base64URL 編碼/解碼 -------------------
-std::string base64UrlEncode(const std::string& input) {
-    BIO* b64 = BIO_new(BIO_f_base64());
-    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
-    BIO* mem = BIO_new(BIO_s_mem());
-    b64 = BIO_push(b64, mem);
-    BIO_write(b64, input.data(), input.size());
-    BIO_flush(b64);
-
-    BUF_MEM* bufferPtr;
-    BIO_get_mem_ptr(b64, &bufferPtr);
-
-    std::string encoded(bufferPtr->data, bufferPtr->length);
-    BIO_free_all(b64);
-
-    // Base64URL 替換
-    for (auto& c : encoded) {
-        if (c == '+') c = '-';
-        else if (c == '/') c = '_';
-    }
-    encoded.erase(remove(encoded.begin(), encoded.end(), '='), encoded.end());
-    return encoded;
-}
-
-std::string base64UrlDecode(const std::string& input) {
-    std::string b64 = input;
-    for (auto& c : b64) {
-        if (c == '-') c = '+';
-        else if (c == '_') c = '/';
-    }
-    while (b64.size() % 4) b64 += '=';
-    BIO* b64bio = BIO_new(BIO_f_base64());
-    BIO_set_flags(b64bio, BIO_FLAGS_BASE64_NO_NL);
-    BIO* mem = BIO_new_mem_buf(b64.data(), b64.size());
-    mem = BIO_push(b64bio, mem);
-    std::vector<char> buffer(b64.size());
-    int len = BIO_read(mem, buffer.data(), buffer.size());
-    BIO_free_all(mem);
-    return std::string(buffer.data(), len);
-}
-
-// ------------------- HMAC-SHA256 -------------------
-std::string hmacSha256(const std::string& data, const std::string& key) {
-    unsigned char result[EVP_MAX_MD_SIZE];
-    unsigned int len = 0;
-    HMAC(EVP_sha256(), key.data(), key.size(),
-         (unsigned char*)data.data(), data.size(), result, &len);
-    return std::string((char*)result, len);
-}
-
-// ------------------- JWT 生成 -------------------
-std::string generateJwt(const std::string& headerJson, const std::string& payloadJson, const std::string& secret) {
-    std::string header = base64UrlEncode(headerJson);
-    std::string payload = base64UrlEncode(payloadJson);
-    std::string data = header + "." + payload;
-    std::string signature = hmacSha256(data, secret);
-    return data + "." + base64UrlEncode(signature);
-}
-
-// ------------------- 日誌紀錄 -------------------
-void log_event(const std::string& event, const std::string& account, const std::string& detail) {
-    std::ofstream file("events.log", std::ios::app);
-    auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    std::stringstream ss;
-    ss << std::put_time(std::localtime(&now), "%Y-%m-%dT%H:%M:%S");
-    file << "{\"timestamp\":\"" << ss.str()
-         << "\",\"event\":\"" << event
-         << "\",\"account\":\"" << account
-         << "\",\"detail\":\"" << detail << "\"}" << std::endl;
-}
-
-// ------------------- 驗證 JWT -------------------
-bool validateJwt(const std::string& token, const std::string& secret, std::string& userId, bool& expired, std::string& detail) {
-    size_t p1 = token.find('.');
-    size_t p2 = token.find('.', p1 + 1);
-    if (p1 == std::string::npos || p2 == std::string::npos) {
-        detail = "malformed token";
-        return false;
+    void logAttack(const std::string& detail) {
+        std::ofstream logStream(logFile, std::ios::app);
+        if (logStream.is_open()) {
+            logStream << detail << std::endl;
+            logStream.close();
+        }
     }
 
-    std::string header_b64 = token.substr(0, p1);
-    std::string payload_b64 = token.substr(p1 + 1, p2 - p1 - 1);
-    std::string sig_b64 = token.substr(p2 + 1);
-
-    std::string data = header_b64 + "." + payload_b64;
-    std::string expected_sig = hmacSha256(data, secret);
-    std::string expected_b64 = base64UrlEncode(expected_sig);
-
-    if (expected_b64 != sig_b64) {
-        detail = "signature mismatch";
-        return false;
+public:
+    void addToken(const std::string& token) {
+        validTokens[token] = true;
     }
 
-    std::string payload = base64UrlDecode(payload_b64);
-    json payloadJson;
-    try {
-        payloadJson = json::parse(payload);
-    } catch (...) {
-        detail = "invalid JSON payload";
-        return false;
-    }
-
-    if (!payloadJson.contains("userId")) {
-        detail = "no userId field";
-        return false;
-    }
-    userId = payloadJson["userId"];
-
-    if (payloadJson.contains("exp")) {
-        uint64_t exp = payloadJson["exp"];
-        uint64_t now = (uint64_t)std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-        if (exp < now) {
-            expired = true;
-            detail = "token expired";
+    bool validateToken(const std::string& token) {
+        if (validTokens.find(token) != validTokens.end() && validTokens[token]) {
+            return true;
+        } else {
+            attackCount++;
+            logAttack("攻擊偵測: 使用 token " + token + " | 攻擊次數: " + std::to_string(attackCount));
             return false;
         }
     }
 
-    return true;
-}
-
-// ------------------- 權限檢查 -------------------
-bool checkPermission(const std::string& userId, const std::string& requiredRole) {
-    static std::map<std::string, std::string> roles = {
-        {"user1", "admin"},
-        {"user2", "viewer"}
-    };
-
-    if (!roles.count(userId)) {
-        log_event("anomaly_user_not_found", userId, "no such account");
-        return false;
+    bool isBlocked() {
+        return attackCount >= attackThreshold;
     }
+};
 
-    std::string role = roles[userId];
-    if (role != requiredRole) {
-        log_event("anomaly_insufficient_permission", userId, "need role=" + requiredRole + ", have=" + role);
-        return false;
-    }
-    return true;
-}
-
-// ------------------- 主程式 -------------------
-int main(int argc, char* argv[]) {
-    const char* env = std::getenv("SECRET_KEY");
-    std::string secret = (env && std::string(env).size() > 0) ? env : FALLBACK_SECRET;
-
-    std::string scenario = "success";
-    if (argc > 1) scenario = argv[1];
-
-    std::string userId = "user1";
-    std::string requiredRole = "admin";
-    uint64_t now = (uint64_t)std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-
-    std::string payloadJson;
-    if (scenario == "success")
-        payloadJson = "{\"userId\":\"user1\",\"exp\":" + std::to_string(now + 3600) + "}";
-    else if (scenario == "invalid_sig")
-        payloadJson = "{\"userId\":\"user1\",\"exp\":" + std::to_string(now + 3600) + "}";
-    else if (scenario == "expired")
-        payloadJson = "{\"userId\":\"user1\",\"exp\":" + std::to_string(now - 60) + "}";
-    else if (scenario == "insufficient_role") {
-        payloadJson = "{\"userId\":\"user1\",\"exp\":" + std::to_string(now + 3600) + "}";
-        requiredRole = "superadmin";
-    } else if (scenario == "user_not_found")
-        payloadJson = "{\"userId\":\"nosuchuser\",\"exp\":" + std::to_string(now + 3600) + "}";
-    else if (scenario == "malformed")
-        payloadJson = "{\"userId\":\"user1\"}";
-    else if (scenario == "tampered")
-        payloadJson = "{\"userId\":\"user1\",\"exp\":" + std::to_string(now + 3600) + "}";
-    else {
-        std::cout << "Unknown scenario: " << scenario << std::endl;
-        return 1;
-    }
-
-    std::string headerJson = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
-    std::string jwt = generateJwt(headerJson, payloadJson, secret);
-
-    std::string validateSecret = secret;
-    if (scenario == "invalid_sig")
-        validateSecret = "different_secret_to_force_invalid_signature";
-    else if (scenario == "malformed")
-        jwt = "this_is_not.a.validtoken";
-    else if (scenario == "tampered") {
-        size_t p1 = jwt.find('.');
-        size_t p2 = jwt.find('.', p1 + 1);
-        std::string header_b64 = jwt.substr(0, p1);
-        std::string sig_b64 = jwt.substr(p2 + 1);
-        std::string tampered = "{\"userId\":\"attacker\",\"exp\":" + std::to_string(now + 3600) + "}";
-        std::string tampered_b64 = base64UrlEncode(tampered);
-        jwt = header_b64 + "." + tampered_b64 + "." + sig_b64;
-    }
-
-    std::cout << "\n=== Scenario: " << scenario << " ===\n";
-    std::cout << "JWT: " << jwt << "\n";
-
-    std::string parsedUser;
-    bool expired = false;
-    std::string detail;
-    bool ok = validateJwt(jwt, validateSecret, parsedUser, expired, detail);
-
-    std::string logUser = parsedUser.empty() ? (scenario=="user_not_found" ? "nosuchuser" : "unknown") : parsedUser;
-
-    if (!ok) {
-        if (expired) {
-            log_event("anomaly_expired_token", logUser, detail);
-            std::cout << "[!] Token expired\n";
+// 反覆輸入並檢查長度在8到16字元的金鑰函式
+std::string inputValidatedKey(const std::string& prompt) {
+    std::string key;
+    while (true) {
+        std::cout << prompt;
+        std::getline(std::cin, key);
+        if (key.length() < 8) {
+            std::cerr << "金鑰太短，請輸入至少8個字元。\n";
+        } else if (key.length() > 16) {
+            std::cerr << "金鑰太長，請輸入不超過16個字元。\n";
         } else {
-            log_event("anomaly_invalid_jwt_signature", logUser, detail);
-            std::cout << "[!] Invalid token: " << detail << "\n";
+            break; // 長度合理，跳出迴圈
         }
+    }
+    return key;
+}
+
+// API請求模擬
+struct ApiRequest {
+    std::string token;
+    std::string payload;
+};
+
+bool defendAgainstSpoofing(const ApiRequest& request, TokenManager& manager) {
+    if (manager.isBlocked()) {
+        std::cerr << "服務已因多次攻擊暫停。\n";
+        return false;
+    }
+    if (!manager.validateToken(request.token)) {
+        std::cerr << "偵測到API偽造攻擊：Token無效或缺失。\n";
+        if (manager.isBlocked()) {
+            std::cerr << "由於多次攻擊，服務已被鎖定。\n";
+        }
+        return false;
+    }
+    std::cout << "API請求驗證通過，處理資料 \"" << request.payload << "\"。\n";
+    return true;
+}
+
+int main() {
+    TokenManager tokenManager;
+
+    // 互動模式設定金鑰
+    std::string key1 = inputValidatedKey("請輸入設定的金鑰 (8-16字元): ");
+    std::string key2 = inputValidatedKey("請再次輸入金鑰以驗證: ");
+    if (key1 != key2) {
+        std::cerr << "兩次輸入的金鑰不一致，程式終止。\n";
         return 1;
     }
+    tokenManager.addToken(key1);
+    std::cout << "金鑰設定成功！\n" << std::endl;
 
-    if (!checkPermission(logUser, requiredRole)) {
-        std::cout << "[!] Permission denied\n";
-        return 1;
+    // 互動驗證流程，使用者可多次輸入Token測試
+    while (true) {
+        std::string inputToken;
+        std::cout << "請輸入API Token以驗證（輸入'exit'結束程式）: ";
+        std::getline(std::cin, inputToken);
+        if (inputToken == "exit") break;
+
+        ApiRequest req{inputToken, "範例資料"};
+        if (!defendAgainstSpoofing(req, tokenManager)) {
+            if (tokenManager.isBlocked()) {
+                std::cerr << "服務因攻擊次數達上限而被鎖定。\n";
+                break;
+            }
+        }
     }
 
-    std::cout << "[+] Access granted for " << logUser << " (role ok)\n";
-    log_event("api_access_granted", logUser, "scenario=" + scenario);
+    std::cout << "結束API演示。\n";
     return 0;
 }
