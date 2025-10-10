@@ -1,0 +1,108 @@
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+
+#define MAX_FAIL 5
+#define BLOCK_DURATION 300 // 5分鐘封鎖
+
+typedef struct {
+    char username[50];
+    int fail_count;
+    time_t block_until;
+} UserStatus;
+
+// 模擬使用者資料庫 (可擴充)
+UserStatus user = {"student1", 0, 0};
+
+int verify_password(const char* username, const char* password);
+int is_blocked(UserStatus* user);
+void record_fail(UserStatus* user);
+void reset_fail(UserStatus* user);
+void log_event(const char* event);
+
+void print_menu() {
+    printf("\n=== 憑證攻擊防禦互動式示範系統 ===\n");
+    printf("1. 嘗試登入\n");
+    printf("2. 顯示目前使用者狀態\n");
+    printf("3. 離開程式\n");
+    printf("請輸入操作選項: ");
+}
+
+void show_user_status(UserStatus* user) {
+    printf("使用者: %s\n", user->username);
+    printf("失敗次數: %d\n", user->fail_count);
+    if (is_blocked(user)) {
+        printf("目前處於封鎖中，封鎖剩餘時間: %ld 秒\n", (user->block_until - time(NULL)));
+    } else {
+        printf("目前無封鎖\n");
+    }
+}
+
+int main() {
+    int choice;
+    char input_pw[50];
+    while (1) {
+        print_menu();
+        scanf("%d", &choice);
+        getchar(); // 吸收換行符
+
+        if (choice == 1) {
+            if (is_blocked(&user)) {
+                printf("帳號目前被封鎖，請稍後再試。\n");
+                log_event("Blocked login attempt");
+                continue;
+            }
+            printf("請輸入密碼: ");
+            fgets(input_pw, sizeof(input_pw), stdin);
+            // 移除尾端換行符
+            input_pw[strcspn(input_pw, "\n")] = 0;
+
+            if (verify_password(user.username, input_pw)) {
+                printf("登入成功！\n");
+                reset_fail(&user);
+                log_event("Successful login");
+            } else {
+                printf("密碼錯誤！\n");
+                record_fail(&user);
+                log_event("Failed login");
+
+                if (user.fail_count >= MAX_FAIL) {
+                    user.block_until = time(NULL) + BLOCK_DURATION;
+                    printf("失敗次數過多，帳號封鎖中！\n");
+                    log_event("User blocked due to too many failed attempts");
+                }
+            }
+        } else if (choice == 2) {
+            show_user_status(&user);
+        } else if (choice == 3) {
+            printf("退出程式。\n");
+            break;
+        } else {
+            printf("無效選項，請重新輸入。\n");
+        }
+    }
+
+    return 0;
+}
+
+// 以下與先前相同
+int verify_password(const char* username, const char* password) {
+    return strcmp(password, "correct_pw") == 0;
+}
+
+int is_blocked(UserStatus* user) {
+    return time(NULL) < user->block_until;
+}
+
+void record_fail(UserStatus* user) {
+    user->fail_count++;
+}
+
+void reset_fail(UserStatus* user) {
+    user->fail_count = 0;
+    user->block_until = 0;
+}
+
+void log_event(const char* event) {
+    printf("[LOG]: %s\n", event);
+}
