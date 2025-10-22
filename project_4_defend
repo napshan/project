@@ -1,0 +1,176 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <stdexcept>
+#include <random>
+#include <cstdint>
+
+// 機敏資料保護模組
+class SensitiveDataProtection {
+private:
+    std::vector<unsigned char> data; // 儲存加密後的資料
+    std::vector<unsigned char> encryption_key; // 記憶體加密金鑰
+    uint32_t stored_crc; // 儲存的 CRC32 校驗值
+    bool has_data; // 追蹤是否有資料儲存
+
+    // 簡單的 CRC32 實現
+    uint32_t calculateCRC32(const std::vector<unsigned char>& input) {
+        std::cout << "[Step] Calculating CRC32 checksum..." << std::endl;
+        uint32_t crc = 0xFFFFFFFF;
+        const uint32_t polynomial = 0xEDB88320;
+
+        for (unsigned char byte : input) {
+            crc ^= byte;
+            for (int i = 0; i < 8; ++i) {
+                crc = (crc >> 1) ^ ((crc & 1) ? polynomial : 0);
+            }
+        }
+        return ~crc;
+    }
+
+    // 簡單的 XOR 記憶體加密
+    void encryptData(std::vector<unsigned char>& input) {
+        std::cout << "[Step] Encrypting data..." << std::endl;
+        for (size_t i = 0; i < input.size(); ++i) {
+            input[i] ^= encryption_key[i % encryption_key.size()];
+        }
+    }
+
+    // 解密資料
+    void decryptData(std::vector<unsigned char>& input) {
+        std::cout << "[Step] Decrypting data..." << std::endl;
+        encryptData(input); // XOR 加密/解密對稱
+    }
+
+    // 驗證資料完整性
+    bool verifyIntegrity(const std::vector<unsigned char>& input) {
+        std::cout << "[Step] Verifying data integrity..." << std::endl;
+        uint32_t computed_crc = calculateCRC32(input);
+        bool is_valid = computed_crc == stored_crc;
+        std::cout << "[Step] Integrity check " << (is_valid ? "passed" : "failed") << std::endl;
+        return is_valid;
+    }
+
+    // 生成隨機金鑰
+    std::vector<unsigned char> generateKey(size_t length) {
+        std::cout << "[Step] Generating random key..." << std::endl;
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> dis(0, 255);
+        
+        std::vector<unsigned char> key(length);
+        for (size_t i = 0; i < length; ++i) {
+            key[i] = static_cast<unsigned char>(dis(gen));
+        }
+        return key;
+    }
+
+public:
+    SensitiveDataProtection() : has_data(false) {
+        // 初始化加密金鑰
+        encryption_key = generateKey(16); // 128-bit 記憶體加密金鑰
+        std::cout << "[Step] SensitiveDataProtection initialized" << std::endl;
+    }
+
+    // 儲存機敏資料
+    void storeData(const std::string& input) {
+        std::cout << "[Step] Storing sensitive data..." << std::endl;
+        if (input.empty()) {
+            throw std::runtime_error("Error: Input data cannot be empty");
+        }
+        data.assign(input.begin(), input.end());
+        
+        // 計算並儲存 CRC32
+        stored_crc = calculateCRC32(data);
+        
+        // 加密資料
+        encryptData(data);
+        has_data = true;
+        std::cout << "[Step] Data stored successfully" << std::endl;
+    }
+
+    // 獲取機敏資料
+    std::string retrieveData() {
+        if (!has_data) {
+            throw std::runtime_error("Error: No data stored");
+        }
+        std::cout << "[Step] Retrieving sensitive data..." << std::endl;
+        
+        // 複製資料以進行驗證
+        std::vector<unsigned char> temp_data = data;
+        
+        // 解密資料
+        decryptData(temp_data);
+        
+        // 驗證完整性
+        if (!verifyIntegrity(temp_data)) {
+            throw std::runtime_error("Data integrity check failed: possible tampering detected");
+        }
+        
+        std::string result(temp_data.begin(), temp_data.end());
+        std::cout << "[Step] Data retrieved successfully" << std::endl;
+        return result;
+    }
+
+    // 更新資料
+    void updateData(const std::string& new_data) {
+        std::cout << "[Step] Updating sensitive data..." << std::endl;
+        storeData(new_data);
+        std::cout << "[Step] Data updated successfully" << std::endl;
+    }
+};
+
+// 顯示選單
+void showMenu() {
+    std::cout << "\n=== Sensitive Data Protection System ===" << std::endl;
+    std::cout << "1. Store sensitive data" << std::endl;
+    std::cout << "2. Retrieve sensitive data" << std::endl;
+    std::cout << "3. Update sensitive data" << std::endl;
+    std::cout << "4. Exit" << std::endl;
+    std::cout << "Enter your choice (1-4): ";
+}
+
+// 主程式實現互動式介面
+int main() {
+    SensitiveDataProtection protector;
+    std::string input;
+    int choice;
+
+    while (true) {
+        showMenu();
+        std::cin >> choice;
+        std::cin.ignore(); // 清除換行符
+
+        try {
+            switch (choice) {
+                case 1: // 儲存資料
+                    std::cout << "\nEnter sensitive data to store: ";
+                    std::getline(std::cin, input);
+                    protector.storeData(input);
+                    break;
+
+                case 2: // 檢索資料
+                    std::cout << "\nRetrieved data: " << protector.retrieveData() << std::endl;
+                    break;
+
+                case 3: // 更新資料
+                    std::cout << "\nEnter new sensitive data: ";
+                    std::getline(std::cin, input);
+                    protector.updateData(input);
+                    break;
+
+                case 4: // 退出
+                    std::cout << "[Step] Exiting program..." << std::endl;
+                    return 0;
+
+                default:
+                    std::cout << "Invalid choice! Please enter a number between 1 and 4." << std::endl;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+        }
+        std::cout << std::endl;
+    }
+
+    return 0;
+}
