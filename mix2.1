@@ -1,0 +1,49 @@
+import time
+
+print("=== Purple Team：憑證帳號攻擊 × 異常登入偵測 Demo ===\n")
+
+# ======================
+# 攻擊端（Red Team）
+# ======================
+attack_passwords = [
+    "123456",
+    "password",
+    "qwerty",
+    "admin",
+    "letmein",
+    "secure123"   # 正確密碼（假設）
+]
+
+# ======================
+# 防禦端（Blue Team）
+# ======================
+CORRECT_PASSWORD = "secure123"
+MAX_TRY = 3
+fail_count = 0
+blocked = False
+
+# ======================
+# Purple Team 整合流程
+# ======================
+for pwd in attack_passwords:
+    if blocked:
+        print("[BLUE] 🚨 帳號已被封鎖，拒絕所有登入請求")
+        break
+
+    print(f"[RED ] 嘗試密碼：{pwd}")
+    time.sleep(1)
+
+    # 防禦邏輯
+    if pwd == CORRECT_PASSWORD:
+        print("[BLUE] ✅ 登入成功")
+        break
+    else:
+        fail_count += 1
+        print(f"[BLUE] ❌ 登入失敗（第 {fail_count} 次）")
+
+        if fail_count >= MAX_TRY:
+            blocked = True
+            print("[BLUE] 🚨 偵測到異常登入行為，帳號已封鎖")
+            break
+
+print("\n=== 攻防示範結束 ===")
