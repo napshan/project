@@ -1,0 +1,95 @@
+import time
+
+# =========================
+# 防禦端（Blue Team）
+# =========================
+
+MAX_FAIL = 5
+BLOCK_DURATION = 300  # 5 分鐘（示範可自行改小）
+
+class UserStatus:
+    def __init__(self, username):
+        self.username = username
+        self.fail_count = 0
+        self.block_until = 0
+
+user = UserStatus("student1")
+
+def verify_password(password):
+    return password == "correct_pw"
+
+def is_blocked(user):
+    return time.time() < user.block_until
+
+def record_fail(user):
+    user.fail_count += 1
+
+def reset_fail(user):
+    user.fail_count = 0
+    user.block_until = 0
+
+def log_event(event):
+    print(f"[LOG] {event}")
+
+def defend_login(user, password):
+    if is_blocked(user):
+        remaining = int(user.block_until - time.time())
+        print(f"[BLUE] 🚫 帳號封鎖中，剩餘 {remaining} 秒")
+        log_event("Blocked login attempt")
+        return False
+
+    if verify_password(password):
+        print("[BLUE] ✅ 登入成功")
+        reset_fail(user)
+        log_event("Successful login")
+        return True
+    else:
+        print("[BLUE] ❌ 密碼錯誤")
+        record_fail(user)
+        log_event("Failed login")
+
+        if user.fail_count >= MAX_FAIL:
+            user.block_until = time.time() + BLOCK_DURATION
+            print("[BLUE] 🚨 失敗次數過多，帳號已封鎖")
+            log_event("User blocked due to too many failed attempts")
+
+        return False
+
+
+# =========================
+# 攻擊端（Red Team）
+# =========================
+
+password_list = [
+    "123456", "password", "admin", "student", "student1",
+    "1234", "0000", "1111", "test123", "correct_pw"
+]
+
+def brute_force_attack(user):
+    print("=== 模擬暴力破解登入攻擊 ===")
+    print(f"目標帳號：{user.username}")
+    print("---------------------------------")
+
+    for i, pw in enumerate(password_list, start=1):
+        print(f"[RED ] 嘗試第 {i} 個密碼：{pw}")
+        success = defend_login(user, pw)
+        time.sleep(1)
+
+        if success:
+            print("[RED ] 🎯 攻擊成功，停止嘗試")
+            return
+
+    print("\n[RED ] ❌ 所有密碼嘗試完畢，帳號可能已被封鎖")
+
+
+# =========================
+# Purple Team 整合展示
+# =========================
+
+def main():
+    print("=== Purple Team：憑證攻擊 × 異常登入偵測 ===\n")
+    brute_force_attack(user)
+    print("\n=== 攻防示範結束 ===")
+
+if __name__ == "__main__":
+    main()
