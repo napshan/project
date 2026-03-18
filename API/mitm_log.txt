@@ -1,0 +1,48 @@
+[MITM] Proxy running on port 8888 -> Target 127.0.0.1:5000
+[MITM] Request: GET /api/data HTTP/1.1
+[MITM] Intercepted Token: Bearer NORMAL_USER_TOKEN
+[MITM] >>> Attack: Replaced Authorization header with FORGED token.
+[MITM] Request: GET /api/data HTTP/1.1
+[MITM] Intercepted Token: Bearer <把剛剛複製的那串Token貼在這裡>
+[MITM] >>> Attack: Replaced Authorization header with FORGED token.
+[MITM] Proxy running on port 8888 -> Target 127.0.0.1:5000
+[MITM] Request: GET /api/data HTTP/1.1
+[MITM] Intercepted Token: Bearer NORMAL_USER_TOKEN
+[MITM] >>> Attack: Replaced Authorization header with FORGED token.
+[MITM] Request: GET /api/data HTTP/1.1
+[MITM] Intercepted Token: Bearer <Bearer admin.48a737d3d6380b42b6fb9a0bd312f4f077c7ab2848db03575d1b057858cb63f7>
+[MITM] >>> Attack: Replaced Authorization header with FORGED token.
+[MITM] Proxy running on port 8888 -> Target 127.0.0.1:5000
+[MITM] Request: GET /api/data HTTP/1.1
+[MITM] Intercepted Token: Bearer NORMAL_USER_TOKEN
+[MITM] >>> Attack: Replaced Authorization header with FORGED token.
+[MITM] Request: GET /api/data HTTP/1.1
+[MITM] Intercepted Token: Bearer admin.48a737d3d6380b42b6fb9a0bd312f4f077c7ab2848db03575d1b057858cb63f7
+[MITM] >>> Attack: Replaced Authorization header with FORGED token.
+[MITM] Proxy running on port 8888 -> Target 127.0.0.1:5000
+[MITM] Proxy running on port 8888 -> Target 127.0.0.1:5000
+[MITM] Proxy running on port 8888 -> Target 127.0.0.1:5000
+[MITM] Request: GET /api/data HTTP/1.1
+[MITM] Intercepted Token: Bearer NORMAL_USER_TOKEN
+[MITM] >>> Attack: Replaced Authorization header with FORGED token.
+[MITM] Request: GET /api/data HTTP/1.1
+[MITM] Intercepted Token: Bearer NORMAL_USER_TOKEN
+[MITM] >>> Attack: Replaced Authorization header with FORGED token.
+[MITM] Proxy running on port 8888 -> Target 127.0.0.1:5000
+[MITM] Request: GET /api/data HTTP/1.1
+[MITM] Intercepted Token: Bearer NORMAL_USER_TOKEN
+[MITM] >>> Attack: Replaced Authorization header with FORGED token.
+[MITM] Proxy running on port 8888 -> Target 127.0.0.1:5000
+[MITM] Request: GET /api/data HTTP/1.1
+[MITM] Intercepted Token: Bearer NORMAL_USER_TOKEN
+[MITM] >>> Attack: Replaced Authorization header with FORGED token.
+[MITM] Request: GET /api/data HTTP/1.1
+[MITM] Intercepted Token: Bearer NORMAL_USER_TOKEN
+[MITM] >>> Attack: Replaced Authorization header with FORGED token.
+[MITM] Request: GET /api/data HTTP/1.1
+[MITM] Intercepted Token: Bearer NORMAL_USER_TOKEN
+[MITM] >>> Attack: Replaced Authorization header with FORGED token.
+[MITM] Request: GET /api/data HTTP/1.1
+[MITM] Intercepted Token: Bearer NORMAL_USER_TOKEN
+[MITM] >>> Attack: Replaced Authorization header with FORGED token.
+[MITM] Proxy running on port 8888 -> Target 127.0.0.1:5000
